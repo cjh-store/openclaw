@@ -8,7 +8,7 @@ import {
 const baseAttempt = {
   provider: "demo-primary",
   model: "demo-primary/model-a",
-  error: "Provider demo-primary is in cooldown (all profiles unavailable)",
+  error: "提供方 demo-primary 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
   reason: "rate_limit" as const,
 };
 

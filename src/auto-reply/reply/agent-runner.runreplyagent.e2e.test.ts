@@ -848,7 +848,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
             {
               provider: "fireworks",
               model: "fireworks/minimax-m2p5",
-              error: "Provider fireworks is in cooldown (all profiles unavailable)",
+              error: "提供方 fireworks 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
               reason: "rate_limit",
             },
           ],
@@ -909,7 +909,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
             {
               provider: "fireworks",
               model: "fireworks/minimax-m2p5",
-              error: "Provider fireworks is in cooldown (all profiles unavailable)",
+              error: "提供方 fireworks 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
               reason: "rate_limit",
             },
           ],
@@ -983,7 +983,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
               {
                 provider: "fireworks",
                 model: "fireworks/minimax-m2p5",
-                error: "Provider fireworks is in cooldown (all profiles unavailable)",
+                error: "提供方 fireworks 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
                 reason: "rate_limit",
               },
             ],
@@ -1046,7 +1046,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
                 {
                   provider: "fireworks",
                   model: "fireworks/minimax-m2p5",
-                  error: "Provider fireworks is in cooldown (all profiles unavailable)",
+                  error: "提供方 fireworks 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
                   reason: "rate_limit",
                 },
               ],
@@ -1126,7 +1126,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
                 {
                   provider: "fireworks",
                   model: "fireworks/minimax-m2p5",
-                  error: "Provider fireworks is in cooldown (all profiles unavailable)",
+                  error: "提供方 fireworks 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
                   reason: "rate_limit",
                 },
               ],
@@ -1215,7 +1215,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
               {
                 provider: "anthropic",
                 model: "claude",
-                error: "Provider anthropic is in cooldown (all profiles unavailable)",
+                error: "提供方 anthropic 正在冷却中（全局生效：该提供方下所有账号当前均不可用）",
                 reason: testCase.reportedReason,
               },
             ],

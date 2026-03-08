@@ -573,7 +573,9 @@ function resolveCooldownDecision(params: {
     return {
       type: "skip",
       reason: inferredReason,
-      error: `Provider ${params.candidate.provider} is in cooldown (all profiles unavailable)`,
+      error:
+        `提供方 ${params.candidate.provider} 正在冷却中 ` +
+        `（全局生效：该提供方下所有账号当前均不可用）`,
     };
   }
 
@@ -644,6 +646,10 @@ export async function runWithModelFallback<T>(params: {
         });
 
         if (decision.type === "skip") {
+          log.warn(
+            `provider-circuit-open scope=provider-global provider=${sanitizeForLog(candidate.provider)} ` +
+              `reason=${decision.reason ?? "unknown"} detail=all-profiles-unavailable`,
+          );
           attempts.push({
             provider: candidate.provider,
             model: candidate.model,
