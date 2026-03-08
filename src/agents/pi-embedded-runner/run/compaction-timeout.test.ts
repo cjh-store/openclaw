@@ -12,7 +12,7 @@ function expectSelectedSnapshot(params: {
   currentSnapshot: Parameters<typeof selectCompactionTimeoutSnapshot>[0]["currentSnapshot"];
   expectedSessionIdUsed: string;
   expectedSnapshot: ReadonlyArray<ReturnType<typeof castAgentMessage>>;
-  expectedSource: "current" | "pre-compaction";
+  expectedSource: "current" | "pre-compaction" | "empty";
   preCompactionSessionId: string;
   preCompactionSnapshot: Parameters<
     typeof selectCompactionTimeoutSnapshot
@@ -96,7 +96,7 @@ describe("compaction-timeout helpers", () => {
     ).toBe(1_500_000);
   });
 
-  it("uses pre-compaction snapshot when compaction timeout occurs", () => {
+  it("returns an empty snapshot when compaction timeout occurs", () => {
     const pre = [castAgentMessage({ role: "assistant", content: "pre" })] as const;
     const current = [castAgentMessage({ role: "assistant", content: "current" })] as const;
     expectSelectedSnapshot({
@@ -105,13 +105,13 @@ describe("compaction-timeout helpers", () => {
       preCompactionSessionId: "session-pre",
       currentSnapshot: [...current],
       currentSessionId: "session-current",
-      expectedSource: "pre-compaction",
-      expectedSessionIdUsed: "session-pre",
-      expectedSnapshot: pre,
+      expectedSource: "empty",
+      expectedSessionIdUsed: "session-current",
+      expectedSnapshot: [],
     });
   });
 
-  it("falls back to current snapshot when pre-compaction snapshot is unavailable", () => {
+  it("still returns an empty snapshot when pre-compaction snapshot is unavailable", () => {
     const current = [castAgentMessage({ role: "assistant", content: "current" })] as const;
     expectSelectedSnapshot({
       timedOutDuringCompaction: true,
@@ -119,9 +119,9 @@ describe("compaction-timeout helpers", () => {
       preCompactionSessionId: "session-pre",
       currentSnapshot: [...current],
       currentSessionId: "session-current",
-      expectedSource: "current",
+      expectedSource: "empty",
       expectedSessionIdUsed: "session-current",
-      expectedSnapshot: current,
+      expectedSnapshot: [],
     });
   });
 });

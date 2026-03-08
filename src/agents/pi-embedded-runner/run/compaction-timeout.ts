@@ -42,7 +42,7 @@ export type SnapshotSelectionParams = {
 export type SnapshotSelection = {
   messagesSnapshot: AgentMessage[];
   sessionIdUsed: string;
-  source: "pre-compaction" | "current";
+  source: "pre-compaction" | "current" | "empty";
 };
 
 export function selectCompactionTimeoutSnapshot(
@@ -56,17 +56,9 @@ export function selectCompactionTimeoutSnapshot(
     };
   }
 
-  if (params.preCompactionSnapshot) {
-    return {
-      messagesSnapshot: params.preCompactionSnapshot,
-      sessionIdUsed: params.preCompactionSessionId,
-      source: "pre-compaction",
-    };
-  }
-
   return {
-    messagesSnapshot: params.currentSnapshot,
+    messagesSnapshot: [],
     sessionIdUsed: params.currentSessionId,
-    source: "current",
+    source: "empty",
   };
 }

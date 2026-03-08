@@ -1646,8 +1646,9 @@ export async function runEmbeddedAttempt(
           isCacheTtlEligibleProvider,
         });
 
-        // If timeout occurred during compaction, use pre-compaction snapshot when available
-        // (compaction restructures messages but does not add user/assistant turns).
+        // If timeout occurred during compaction, do not reuse stale snapshots from
+        // before or during compaction. Falling back to an empty snapshot avoids
+        // replaying an old assistant turn as if it belonged to the current request.
         const snapshotSelection = selectCompactionTimeoutSnapshot({
           timedOutDuringCompaction,
           preCompactionSnapshot,
