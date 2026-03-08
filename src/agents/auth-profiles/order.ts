@@ -16,6 +16,38 @@ import {
   resolveProfileUnusableUntil,
 } from "./usage.js";
 
+const ROTATING_AUTH_PROVIDER_WINDOW_HOURS: Partial<Record<string, number>> = {
+  "openai-codex": 1,
+};
+
+function stableWindowHash(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function rotateProfilesByWindow(params: {
+  provider: string;
+  profileIds: string[];
+  now: number;
+}): string[] {
+  const windowHours = ROTATING_AUTH_PROVIDER_WINDOW_HOURS[params.provider];
+  if (!windowHours || params.profileIds.length < 2) {
+    return params.profileIds;
+  }
+  const windowKey = Math.floor(params.now / (windowHours * 60 * 60 * 1000));
+  return params.profileIds
+    .map((profileId) => ({
+      profileId,
+      rank: stableWindowHash(`${params.provider}:${windowKey}:${profileId}`),
+    }))
+    .toSorted((a, b) => a.rank - b.rank || a.profileId.localeCompare(b.profileId))
+    .map((entry) => entry.profileId);
+}
+
 export type AuthProfileEligibilityReasonCode =
   | AuthCredentialReasonCode
   | "profile_missing"
@@ -138,7 +170,14 @@ export function resolveAuthProfileOrder(params: {
       .toSorted((a, b) => a.cooldownUntil - b.cooldownUntil)
       .map((entry) => entry.profileId);
 
-    const ordered = [...available, ...cooldownSorted];
+    const ordered = [
+      ...rotateProfilesByWindow({
+        provider: providerKey,
+        profileIds: available,
+        now,
+      }),
+      ...cooldownSorted,
+    ];
 
     // Still put preferredProfile first if specified
     if (preferredProfile && ordered.includes(preferredProfile)) {
@@ -150,7 +189,7 @@ export function resolveAuthProfileOrder(params: {
   // Otherwise, use round-robin: sort by lastUsed (oldest first)
   // preferredProfile goes first if specified (for explicit user choice)
   // lastGood is NOT prioritized - that would defeat round-robin
-  const sorted = orderProfilesByMode(deduped, store);
+  const sorted = orderProfilesByMode(deduped, store, providerKey);
 
   if (preferredProfile && sorted.includes(preferredProfile)) {
     return [preferredProfile, ...sorted.filter((e) => e !== preferredProfile)];
@@ -159,7 +198,7 @@ export function resolveAuthProfileOrder(params: {
   return sorted;
 }
 
-function orderProfilesByMode(order: string[], store: AuthProfileStore): string[] {
+function orderProfilesByMode(order: string[], store: AuthProfileStore, provider: string): string[] {
   const now = Date.now();
 
   // Partition into available and in-cooldown
@@ -195,6 +234,12 @@ function orderProfilesByMode(order: string[], store: AuthProfileStore): string[]
     })
     .map((entry) => entry.profileId);
 
+  const rotated = rotateProfilesByWindow({
+    provider,
+    profileIds: sorted,
+    now,
+  });
+
   // Append cooldown profiles at the end (sorted by cooldown expiry, soonest first)
   const cooldownSorted = inCooldown
     .map((profileId) => ({
@@ -204,5 +249,5 @@ function orderProfilesByMode(order: string[], store: AuthProfileStore): string[]
     .toSorted((a, b) => a.cooldownUntil - b.cooldownUntil)
     .map((entry) => entry.profileId);
 
-  return [...sorted, ...cooldownSorted];
+  return [...rotated, ...cooldownSorted];
 }
