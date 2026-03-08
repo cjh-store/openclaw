@@ -76,6 +76,7 @@ describe("failover-error", () => {
     expect(resolveFailoverReasonFromError({ status: 502 })).toBe("timeout");
     expect(resolveFailoverReasonFromError({ status: 503 })).toBe("timeout");
     expect(resolveFailoverReasonFromError({ status: 504 })).toBe("timeout");
+    expect(resolveFailoverReasonFromError({ status: 520 })).toBe("timeout");
     expect(resolveFailoverReasonFromError({ status: 521 })).toBeNull();
     expect(resolveFailoverReasonFromError({ status: 522 })).toBeNull();
     expect(resolveFailoverReasonFromError({ status: 523 })).toBeNull();

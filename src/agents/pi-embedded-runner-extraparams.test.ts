@@ -1815,6 +1815,49 @@ describe("applyExtraParamsToAgent", () => {
     });
   });
 
+  it("forces non-stream payloads for anyrouter Anthropic models", () => {
+    const payload = runResponsesPayloadMutationCase({
+      applyProvider: "anyrouter",
+      applyModelId: "claude-opus-4-6",
+      model: {
+        api: "anthropic-messages",
+        provider: "anyrouter",
+        id: "claude-opus-4-6",
+        baseUrl: "https://api.anyrouter.top/anthropic",
+      } as unknown as Model<"anthropic-messages">,
+      payload: {
+        stream: true,
+      },
+    });
+    expect(payload.stream).toBe(false);
+  });
+
+  it("strips Anthropic beta headers for anyrouter Anthropic models", () => {
+    const { calls, agent } = createOptionsCaptureAgent();
+    const cfg = buildAnthropicModelConfig("anyrouter/claude-opus-4-6", { context1m: true });
+
+    applyExtraParamsToAgent(agent, cfg, "anyrouter", "claude-opus-4-6");
+
+    const model = {
+      api: "anthropic-messages",
+      provider: "anyrouter",
+      id: "claude-opus-4-6",
+      baseUrl: "https://api.anyrouter.top/anthropic",
+    } as unknown as Model<"anthropic-messages">;
+    const context: Context = { messages: [] };
+
+    void agent.streamFn?.(model, context, {
+      apiKey: "sk-ant-api03-test",
+      headers: {
+        "X-Custom": "1",
+        "anthropic-beta": "prompt-caching-2024-07-31,fine-grained-tool-streaming-2025-05-14",
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers).toEqual({ "X-Custom": "1" });
+  });
+
   it("ignores context1m for non-Opus/Sonnet Anthropic models", () => {
     const cfg = buildAnthropicModelConfig("anthropic/claude-haiku-3-5", { context1m: true });
     const headers = runAnthropicHeaderCase({

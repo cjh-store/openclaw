@@ -362,6 +362,25 @@ export async function runEmbeddedPiAgent(
           throw err;
         }
       };
+      const maybeBackoffBeforeRetry = async (iteration: number) => {
+        if (iteration <= 1) {
+          return;
+        }
+        const delayMs = computeBackoff(RUN_RETRY_BACKOFF_POLICY, iteration);
+        log.info(
+          `retry backoff for ${provider}/${modelId}: iteration=${iteration} delayMs=${delayMs}`,
+        );
+        try {
+          await sleepWithAbort(delayMs, params.abortSignal);
+        } catch (err) {
+          if (params.abortSignal?.aborted) {
+            const abortErr = new Error("Operation aborted", { cause: err });
+            abortErr.name = "AbortError";
+            throw abortErr;
+          }
+          throw err;
+        }
+      };
       // Resolve the context engine once and reuse across retries to avoid
       // repeated initialization/connection overhead per attempt.
       ensureContextEnginesInitialized();
@@ -456,6 +475,7 @@ export async function runEmbeddedPiAgent(
             );
             throw new LiveSessionModelSwitchError(nextSelection);
           }
+          await maybeBackoffBeforeRetry(runLoopIterations);
           const runtimeAuthRetry = authRetryPending;
           authRetryPending = false;
           attemptedThinking.add(thinkLevel);
@@ -1269,7 +1289,7 @@ export async function runEmbeddedPiAgent(
           // Timeout aborts can leave the run without any assistant payloads.
           // Emit an explicit timeout error instead of silently completing, so
           // callers do not lose the turn as an orphaned user message.
-          if (timedOut && !timedOutDuringCompaction && payloads.length === 0) {
+          if (timedOut && payloads.length === 0) {
             return {
               payloads: [
                 {
