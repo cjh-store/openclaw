@@ -71,6 +71,33 @@ function renderTelegramHtml(ir: MarkdownIR): string {
   });
 }
 
+const TELEGRAM_RULE_SEPARATOR = "◆◆◆◆◆◆◆◆◆";
+
+function rewriteTelegramBlockquotes(html: string): string {
+  const withSeparatedBlocks = html.replace(
+    /<\/blockquote>\s*<blockquote>/g,
+    "</blockquote>\n\n<blockquote>",
+  );
+  return withSeparatedBlocks.replace(
+    /<blockquote>([\s\S]*?)<\/blockquote>/g,
+    (_match, content: string) =>
+      content
+        .replace(/\n+$/g, "")
+        .split("\n")
+        .map((line) => (line ? `┃ ${line}` : ""))
+        .join("\n"),
+  );
+}
+
+function postProcessTelegramHtml(html: string): string {
+  const withPrefixedQuotes = rewriteTelegramBlockquotes(html);
+  const withPrettySeparators = withPrefixedQuotes.replace(
+    /(^|\n)───(?=\n|$)/g,
+    `$1${TELEGRAM_RULE_SEPARATOR}`,
+  );
+  return withPrettySeparators.replace(/\n{3,}/g, "\n\n");
+}
+
 export function markdownToTelegramHtml(
   markdown: string,
   options: { tableMode?: MarkdownTableMode; wrapFileRefs?: boolean } = {},
@@ -78,11 +105,11 @@ export function markdownToTelegramHtml(
   const ir = markdownToIR(markdown ?? "", {
     linkify: true,
     enableSpoilers: true,
-    headingStyle: "none",
+    headingStyle: "bold",
     blockquotePrefix: "",
-    tableMode: options.tableMode,
+    tableMode: options.tableMode ?? "code",
   });
-  const html = renderTelegramHtml(ir);
+  const html = postProcessTelegramHtml(renderTelegramHtml(ir));
   // Apply file reference wrapping if requested (for chunked rendering)
   if (options.wrapFileRefs !== false) {
     return wrapFileReferencesInHtml(html);
@@ -544,7 +571,7 @@ function mergeMarkdownIRChunks(left: MarkdownIR, right: MarkdownIR): MarkdownIR 
 }
 
 function renderTelegramChunkHtml(ir: MarkdownIR): string {
-  return wrapFileReferencesInHtml(renderTelegramHtml(ir));
+  return wrapFileReferencesInHtml(postProcessTelegramHtml(renderTelegramHtml(ir)));
 }
 
 function findLargestTelegramChunkTextLengthWithinHtmlLimit(
@@ -770,9 +797,9 @@ export function markdownToTelegramChunks(
   const ir = markdownToIR(markdown ?? "", {
     linkify: true,
     enableSpoilers: true,
-    headingStyle: "none",
+    headingStyle: "bold",
     blockquotePrefix: "",
-    tableMode: options.tableMode,
+    tableMode: options.tableMode ?? "code",
   });
   return renderTelegramChunksWithinHtmlLimit(ir, limit);
 }

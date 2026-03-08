@@ -19,37 +19,31 @@ describe("markdownToTelegramHtml", () => {
       ["renders paragraphs with blank lines", "first\n\nsecond", "first\n\nsecond"],
       ["renders lists without block HTML", "- one\n- two", "• one\n• two"],
       ["renders ordered lists with numbering", "2. two\n3. three", "2. two\n3. three"],
-      ["flattens headings", "# Title", "Title"],
+      ["renders headings as bold titles", "# Title", "<b>Title</b>"],
     ] as const;
     for (const [name, input, expected] of cases) {
       expect(markdownToTelegramHtml(input), name).toBe(expected);
     }
   });
 
-  it("renders blockquotes as native Telegram blockquote tags", () => {
+  it("renders blockquotes as prefixed quote lines", () => {
     const res = markdownToTelegramHtml("> Quote");
-    expect(res).toContain("<blockquote>");
-    expect(res).toContain("Quote");
-    expect(res).toContain("</blockquote>");
+    expect(res).toBe("┃ Quote");
   });
 
   it("renders blockquotes with inline formatting", () => {
     const res = markdownToTelegramHtml("> **bold** quote");
-    expect(res).toContain("<blockquote>");
-    expect(res).toContain("<b>bold</b>");
-    expect(res).toContain("</blockquote>");
+    expect(res).toBe("┃ <b>bold</b> quote");
   });
 
-  it("renders multiline blockquotes as a single Telegram blockquote", () => {
+  it("renders multiline blockquotes as prefixed lines", () => {
     const res = markdownToTelegramHtml("> first\n> second");
-    expect(res).toBe("<blockquote>first\nsecond</blockquote>");
+    expect(res).toBe("┃ first\n┃ second");
   });
 
-  it("renders separated quoted paragraphs as distinct blockquotes", () => {
+  it("renders separated quoted paragraphs as distinct prefixed blocks", () => {
     const res = markdownToTelegramHtml("> first\n\n> second");
-    expect(res).toContain("<blockquote>first");
-    expect(res).toContain("<blockquote>second</blockquote>");
-    expect(res.match(/<blockquote>/g)).toHaveLength(2);
+    expect(res).toBe("┃ first\n\n┃ second");
   });
 
   it("renders fenced code blocks", () => {
@@ -93,6 +87,24 @@ describe("markdownToTelegramHtml", () => {
   it("renders spoiler with nested formatting", () => {
     const res = markdownToTelegramHtml("||**secret** text||");
     expect(res).toBe("<tg-spoiler><b>secret</b> text</tg-spoiler>");
+  });
+
+  it("renders markdown tables as preformatted code blocks by default", () => {
+    const res = markdownToTelegramHtml("| Name | Score |\n| --- | --- |\n| A | 1 |");
+    expect(res).toContain("<pre><code>");
+    expect(res).toContain("Name");
+    expect(res).toContain("Score");
+    expect(res).toContain("</code></pre>");
+  });
+
+  it("renders thematic breaks as the custom visual separator", () => {
+    const res = markdownToTelegramHtml("foo\n\n---\n\nbar");
+    expect(res).toBe("foo\n\n◆◆◆◆◆◆◆◆◆\n\nbar");
+  });
+
+  it("compresses excessive blank lines after formatting", () => {
+    const res = markdownToTelegramHtml("first\n\n\n\nsecond");
+    expect(res).toBe("first\n\nsecond");
   });
 
   it("does not treat single pipe as spoiler", () => {
