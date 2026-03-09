@@ -48,6 +48,48 @@ function rotateProfilesByWindow(params: {
     .map((entry) => entry.profileId);
 }
 
+type RankedProfile = {
+  profileId: string;
+  typeScore: number;
+  lastUsed: number;
+  usedPercent: number;
+  rank: number;
+  loadTier: number;
+};
+
+function assignUsageLoadTiers(
+  profiles: Array<Omit<RankedProfile, "loadTier">>,
+): Map<string, number> {
+  const tiers = new Map<string, number>();
+  const sorted = profiles.toSorted((a, b) => {
+    if (a.typeScore !== b.typeScore) {
+      return a.typeScore - b.typeScore;
+    }
+    if (a.usedPercent !== b.usedPercent) {
+      return a.usedPercent - b.usedPercent;
+    }
+    return a.profileId.localeCompare(b.profileId);
+  });
+
+  let currentTypeScore: number | null = null;
+  let currentTier = 0;
+  let previousUsedPercent = 0;
+
+  for (const profile of sorted) {
+    if (profile.typeScore !== currentTypeScore) {
+      currentTypeScore = profile.typeScore;
+      currentTier = 0;
+    } else if (profile.usedPercent - previousUsedPercent > 10) {
+      currentTier += 1;
+    }
+
+    tiers.set(profile.profileId, currentTier);
+    previousUsedPercent = profile.usedPercent;
+  }
+
+  return tiers;
+}
+
 export type AuthProfileEligibilityReasonCode =
   | AuthCredentialReasonCode
   | "profile_missing"
@@ -147,10 +189,14 @@ export function resolveAuthProfileOrder(params: {
 
   const deduped = dedupeProfileIds(filtered);
 
+  const useWindowLoadOrdering =
+    explicitOrder && explicitOrder.length > 0 && !!ROTATING_AUTH_PROVIDER_WINDOW_HOURS[providerKey];
+
   // If user specified explicit order (store override or config), respect it
-  // exactly, but still apply cooldown sorting to avoid repeatedly selecting
-  // known-bad/rate-limited keys as the first candidate.
-  if (explicitOrder && explicitOrder.length > 0) {
+  // exactly for non-windowed providers, but still apply cooldown sorting to
+  // avoid repeatedly selecting known-bad/rate-limited keys as the first
+  // candidate.
+  if (explicitOrder && explicitOrder.length > 0 && !useWindowLoadOrdering) {
     // ...but still respect cooldown tracking to avoid repeatedly selecting a
     // known-bad/rate-limited key as the first candidate.
     const available: string[] = [];
@@ -170,14 +216,13 @@ export function resolveAuthProfileOrder(params: {
       .toSorted((a, b) => a.cooldownUntil - b.cooldownUntil)
       .map((entry) => entry.profileId);
 
-    const ordered = [
-      ...rotateProfilesByWindow({
-        provider: providerKey,
-        profileIds: available,
-        now,
-      }),
-      ...cooldownSorted,
-    ];
+    const availableSorted = rotateProfilesByWindow({
+      provider: providerKey,
+      profileIds: available,
+      now,
+    });
+
+    const ordered = [...availableSorted, ...cooldownSorted];
 
     // Still put preferredProfile first if specified
     if (preferredProfile && ordered.includes(preferredProfile)) {
@@ -213,34 +258,52 @@ function orderProfilesByMode(order: string[], store: AuthProfileStore, provider:
     }
   }
 
-  // Sort available profiles by type preference, then by lastUsed (oldest first = round-robin within type)
-  const scored = available.map((profileId) => {
+  // Sort available profiles by type preference, load, then round-robin/hash
+  const windowHours = ROTATING_AUTH_PROVIDER_WINDOW_HOURS[provider];
+  const windowKey = windowHours ? Math.floor(now / (windowHours * 60 * 60 * 1000)) : 0;
+
+  const baseScored = available.map((profileId) => {
     const type = store.profiles[profileId]?.type;
     const typeScore = type === "oauth" ? 0 : type === "token" ? 1 : type === "api_key" ? 2 : 3;
-    const lastUsed = store.usageStats?.[profileId]?.lastUsed ?? 0;
-    return { profileId, typeScore, lastUsed };
-  });
+    const stats = store.usageStats?.[profileId];
+    const lastUsed = stats?.lastUsed ?? 0;
+    const usedPercent = stats?.usedPercent ?? 0;
 
-  // Primary sort: type preference (oauth > token > api_key).
-  // Secondary sort: lastUsed (oldest first for round-robin within type).
+    // Create a stable hash rank for the current time window, if applicable
+    const rank = windowHours ? stableWindowHash(`${provider}:${windowKey}:${profileId}`) : 0;
+
+    return { profileId, typeScore, lastUsed, usedPercent, rank };
+  });
+  const loadTiers = assignUsageLoadTiers(baseScored);
+  const scored: RankedProfile[] = baseScored.map((profile) => ({
+    ...profile,
+    loadTier: loadTiers.get(profile.profileId) ?? 0,
+  }));
+
   const sorted = scored
     .toSorted((a, b) => {
-      // First by type (oauth > token > api_key)
+      // 1. By credential type (oauth > token > api_key)
       if (a.typeScore !== b.typeScore) {
         return a.typeScore - b.typeScore;
       }
-      // Then by lastUsed (oldest first)
+
+      // 2. By usage load tier. Profiles stay in the same tier while adjacent
+      //    usage gaps are <= 10%, which keeps "similar load" groups hash-stable.
+      if (a.loadTier !== b.loadTier) {
+        return a.loadTier - b.loadTier;
+      }
+
+      // 3. Time-window hash affinity (if configured, eg openai-codex 1h window)
+      //    We only hash-sort if their usage load is in the same tier.
+      if (windowHours && a.rank !== b.rank) {
+        return a.rank - b.rank;
+      }
+
+      // 4. Fallback to Round-robin by lastUsed earliest
       return a.lastUsed - b.lastUsed;
     })
     .map((entry) => entry.profileId);
 
-  const rotated = rotateProfilesByWindow({
-    provider,
-    profileIds: sorted,
-    now,
-  });
-
-  // Append cooldown profiles at the end (sorted by cooldown expiry, soonest first)
   const cooldownSorted = inCooldown
     .map((profileId) => ({
       profileId,
@@ -249,5 +312,5 @@ function orderProfilesByMode(order: string[], store: AuthProfileStore, provider:
     .toSorted((a, b) => a.cooldownUntil - b.cooldownUntil)
     .map((entry) => entry.profileId);
 
-  return [...rotated, ...cooldownSorted];
+  return [...sorted, ...cooldownSorted];
 }

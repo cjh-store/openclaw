@@ -478,8 +478,46 @@ describe("resolveProviderAuths key normalization", () => {
           },
         });
       },
-      expected: [{ provider: "google-gemini-cli", token: expectedToken }],
+      expected: [expect.objectContaining({ provider: "google-gemini-cli", token: expectedToken })],
     });
+  });
+
+  it("extracts google oauth token from JSON payload in token profiles", async () => {
+    await withSuiteHome(async (home) => {
+      await writeAuthProfiles(home, {
+        "google-gemini-cli:default": {
+          type: "token",
+          provider: "google-gemini-cli",
+          token: '{"token":"google-oauth-token"}',
+        },
+      });
+
+      const auths = await resolveProviderAuths({
+        providers: ["google-gemini-cli"],
+      });
+      expect(auths).toEqual([
+        expect.objectContaining({ provider: "google-gemini-cli", token: "google-oauth-token" }),
+      ]);
+    }, {});
+  });
+
+  it("keeps raw google token when token payload is not JSON", async () => {
+    await withSuiteHome(async (home) => {
+      await writeAuthProfiles(home, {
+        "google-gemini-cli:default": {
+          type: "token",
+          provider: "google-gemini-cli",
+          token: "plain-google-token",
+        },
+      });
+
+      const auths = await resolveProviderAuths({
+        providers: ["google-gemini-cli"],
+      });
+      expect(auths).toEqual([
+        expect.objectContaining({ provider: "google-gemini-cli", token: "plain-google-token" }),
+      ]);
+    }, {});
   });
 
   it("uses config api keys when env and profiles are missing", async () => {
@@ -606,8 +644,10 @@ describe("resolveProviderAuths key normalization", () => {
         config: {},
         env: buildSuiteEnv(home),
       });
-      expect(auths).toEqual([{ provider: "anthropic", token: "anthropic-token" }]);
-    });
+      expect(auths).toEqual([
+        expect.objectContaining({ provider: "anthropic", token: "anthropic-token" }),
+      ]);
+    }, {});
   });
 
   it("skips api_key entries in oauth token resolution order", async () => {
@@ -624,8 +664,8 @@ describe("resolveProviderAuths key normalization", () => {
         config: {},
         env: buildSuiteEnv(home),
       });
-      expect(auths).toEqual([{ provider: "anthropic", token: "token-1" }]);
-    });
+      expect(auths).toEqual([expect.objectContaining({ provider: "anthropic", token: "token-1" })]);
+    }, {});
   });
 
   it("ignores marker-backed config keys for provider usage auth resolution", async () => {

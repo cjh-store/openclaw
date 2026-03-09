@@ -698,3 +698,40 @@ export async function clearAuthProfileCooldown(params: {
   updateUsageStatsEntry(store, profileId, (existing) => resetUsageStats(existing));
   authProfileUsageDeps.saveAuthProfileStore(store, agentDir);
 }
+
+/**
+ * Update the usage percentage (percent loaded) of a profile based on provider responses.
+ */
+export async function updateProfileUsagePercent(params: {
+  store: AuthProfileStore;
+  profileId: string;
+  usedPercent: number;
+  now?: number;
+  agentDir?: string;
+}): Promise<void> {
+  const { store, profileId, usedPercent, now, agentDir } = params;
+  const ts = now ?? Date.now();
+  const updated = await updateAuthProfileStoreWithLock({
+    agentDir,
+    updater: (freshStore) => {
+      if (!freshStore.profiles[profileId]) {
+        return false;
+      }
+      updateUsageStatsEntry(freshStore, profileId, (existing) => ({
+        ...existing,
+        usedPercent,
+        usedPercentUpdatedAt: ts,
+      }));
+      return true;
+    },
+  });
+  if (updated) {
+    store.usageStats = updated.usageStats;
+    return;
+  }
+
+  // Lock failed - do not fall back to unlocked write to avoid race conditions
+  console.warn(
+    `[auth-profiles] Failed to acquire lock for updating usage percent of profile ${profileId}. Skipping update.`,
+  );
+}

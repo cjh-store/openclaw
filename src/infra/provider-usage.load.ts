@@ -1,3 +1,5 @@
+import { ensureAuthProfileStore } from "../agents/auth-profiles.js";
+import { updateProfileUsagePercent } from "../agents/auth-profiles/usage.js";
 import { loadConfig, type OpenClawConfig } from "../config/config.js";
 import { resolveProviderUsageSnapshotWithPlugin } from "../plugins/provider-runtime.js";
 import { resolveFetch } from "./fetch.js";
@@ -163,6 +165,33 @@ async function fetchProviderUsageSnapshot(params: {
   });
 }
 
+function providerSnapshotPriority(snapshot: ProviderUsageSnapshot): number {
+  if (snapshot.windows.length > 0 && !snapshot.error) {
+    return 0;
+  }
+  if (!snapshot.error) {
+    return 1;
+  }
+  return 2;
+}
+
+function collapseProviderSnapshots(snapshots: ProviderUsageSnapshot[]): ProviderUsageSnapshot[] {
+  const collapsed = new Map<string, ProviderUsageSnapshot>();
+
+  for (const snapshot of snapshots) {
+    const existing = collapsed.get(snapshot.provider);
+    if (!existing) {
+      collapsed.set(snapshot.provider, snapshot);
+      continue;
+    }
+    if (providerSnapshotPriority(snapshot) < providerSnapshotPriority(existing)) {
+      collapsed.set(snapshot.provider, snapshot);
+    }
+  }
+
+  return [...collapsed.values()];
+}
+
 export async function loadProviderUsageSummary(
   opts: UsageSummaryOptions = {},
 ): Promise<UsageSummary> {
@@ -188,15 +217,32 @@ export async function loadProviderUsageSummary(
 
   const tasks = auths.map((auth) =>
     withTimeout(
-      fetchProviderUsageSnapshot({
-        auth,
-        config,
-        env,
-        agentDir: opts.agentDir,
-        workspaceDir: opts.workspaceDir,
-        timeoutMs,
-        fetchFn,
-      }),
+      (async (): Promise<ProviderUsageSnapshot> => {
+        const snapshot = await fetchProviderUsageSnapshot({
+          auth,
+          config,
+          env,
+          agentDir: opts.agentDir,
+          workspaceDir: opts.workspaceDir,
+          timeoutMs,
+          fetchFn,
+        });
+
+        if (auth.profileId && snapshot.windows.length > 0) {
+          const maxPercent = Math.max(...snapshot.windows.map((w) => w.usedPercent ?? 0));
+          const store = ensureAuthProfileStore(opts.agentDir, {
+            allowKeychainPrompt: false,
+          });
+          await updateProfileUsagePercent({
+            store,
+            profileId: auth.profileId,
+            usedPercent: maxPercent,
+            now,
+            agentDir: opts.agentDir,
+          });
+        }
+        return snapshot;
+      })(),
       timeoutMs + 1000,
       {
         provider: auth.provider,
@@ -208,15 +254,17 @@ export async function loadProviderUsageSummary(
   );
 
   const snapshots = await Promise.all(tasks);
-  const providers = snapshots.filter((entry) => {
-    if (entry.windows.length > 0) {
-      return true;
-    }
-    if (!entry.error) {
-      return true;
-    }
-    return !ignoredErrors.has(entry.error);
-  });
+  const providers = collapseProviderSnapshots(
+    snapshots.filter((entry) => {
+      if (entry.windows.length > 0) {
+        return true;
+      }
+      if (!entry.error) {
+        return true;
+      }
+      return !ignoredErrors.has(entry.error);
+    }),
+  );
 
   return { updatedAt: now, providers };
 }

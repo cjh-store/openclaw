@@ -125,4 +125,45 @@ describe("resolveAuthProfileOrder - openai-codex hourly rotation", () => {
       "openai-codex:default",
     ]);
   });
+
+  it("uses load tiers for explicit codex order when usage gap exceeds 10%", () => {
+    const store = createCodexStore();
+    vi.spyOn(Date, "now").mockReturnValue(BASE_NOW);
+    store.usageStats = {
+      "openai-codex:default": { usedPercent: 35 },
+      "openai-codex:roxi": { usedPercent: 5 },
+    };
+
+    const order = resolveAuthProfileOrder({
+      store,
+      provider: "openai-codex",
+    });
+
+    expect(order.indexOf("openai-codex:roxi")).toBeLessThan(order.indexOf("openai-codex:default"));
+  });
+
+  it("keeps <=10% codex usage differences in the same hash-stable tier", () => {
+    const store = createCodexStore();
+    vi.spyOn(Date, "now").mockReturnValue(BASE_NOW);
+    store.profiles = {
+      "openai-codex:default": store.profiles["openai-codex:default"],
+      "openai-codex:roxi": store.profiles["openai-codex:roxi"],
+      "openai-codex:oai38": store.profiles["openai-codex:oai38"],
+    };
+    store.order = {
+      "openai-codex": ["openai-codex:default", "openai-codex:roxi", "openai-codex:oai38"],
+    };
+    store.usageStats = {
+      "openai-codex:default": { usedPercent: 10 },
+      "openai-codex:roxi": { usedPercent: 9.9 },
+      "openai-codex:oai38": { usedPercent: 9.8 },
+    };
+
+    const order = resolveAuthProfileOrder({
+      store,
+      provider: "openai-codex",
+    });
+
+    expect(order).toEqual(["openai-codex:oai38", "openai-codex:default", "openai-codex:roxi"]);
+  });
 });

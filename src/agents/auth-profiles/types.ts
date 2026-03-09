@@ -73,6 +73,8 @@ export type ProfileUsageStats = {
   errorCount?: number;
   failureCounts?: Partial<Record<AuthProfileFailureReason, number>>;
   lastFailureAt?: number;
+  usedPercent?: number;
+  usedPercentUpdatedAt?: number;
 };
 
 export type AuthProfileStore = {

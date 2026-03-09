@@ -18,6 +18,7 @@ export type ProviderAuth = {
   provider: UsageProviderId;
   token: string;
   accountId?: string;
+  profileId?: string;
 };
 
 type AuthStore = ReturnType<typeof ensureAuthProfileStore>;
@@ -92,16 +93,17 @@ function resolveProviderApiKeyFromConfigAndStore(params: {
   return undefined;
 }
 
-async function resolveOAuthToken(params: {
+async function resolveAllOAuthTokens(params: {
   state: UsageAuthState;
   provider: UsageProviderId;
-}): Promise<ProviderAuth | null> {
+}): Promise<ProviderAuth[]> {
   const order = resolveAuthProfileOrder({
     cfg: params.state.cfg,
     store: params.state.store,
     provider: params.provider,
   });
   const deduped = dedupeProfileIds(order);
+  const auths: ProviderAuth[] = [];
 
   for (const profileId of deduped) {
     const cred = params.state.store.profiles[profileId];
@@ -120,20 +122,25 @@ async function resolveOAuthToken(params: {
       if (!resolved) {
         continue;
       }
-      return {
+      let token = resolved.apiKey;
+      if (params.provider === "google-gemini-cli") {
+        token = parseGoogleUsageToken(resolved.apiKey);
+      }
+      auths.push({
         provider: params.provider,
-        token: resolved.apiKey,
+        token,
+        profileId,
         accountId:
           cred.type === "oauth" && "accountId" in cred
             ? (cred as { accountId?: string }).accountId
             : undefined,
-      };
+      });
     } catch {
       // ignore
     }
   }
 
-  return null;
+  return auths;
 }
 
 async function resolveProviderUsageAuthViaPlugin(params: {
@@ -156,10 +163,10 @@ async function resolveProviderUsageAuthViaPlugin(params: {
           envDirect: options?.envDirect,
         }),
       resolveOAuthToken: async () => {
-        const auth = await resolveOAuthToken({
+        const auth = (await resolveAllOAuthTokens({
           state: params.state,
           provider: params.provider,
-        });
+        }))[0];
         return auth
           ? {
               token: auth.token,
@@ -182,16 +189,13 @@ async function resolveProviderUsageAuthViaPlugin(params: {
 async function resolveProviderUsageAuthFallback(params: {
   state: UsageAuthState;
   provider: UsageProviderId;
-}): Promise<ProviderAuth | null> {
+}): Promise<ProviderAuth[]> {
   switch (params.provider) {
     case "anthropic":
     case "github-copilot":
     case "openai-codex":
-      return await resolveOAuthToken(params);
-    case "google-gemini-cli": {
-      const auth = await resolveOAuthToken(params);
-      return auth ? { ...auth, token: parseGoogleUsageToken(auth.token) } : null;
-    }
+    case "google-gemini-cli":
+      return await resolveAllOAuthTokens(params);
     case "zai": {
       const apiKey = resolveProviderApiKeyFromConfigAndStore({
         state: params.state,
@@ -199,10 +203,10 @@ async function resolveProviderUsageAuthFallback(params: {
         envDirect: [params.state.env.ZAI_API_KEY, params.state.env.Z_AI_API_KEY],
       });
       if (apiKey) {
-        return { provider: "zai", token: apiKey };
+        return [{ provider: "zai", token: apiKey }];
       }
       const legacyToken = resolveLegacyPiAgentAccessToken(params.state.env, ["z-ai", "zai"]);
-      return legacyToken ? { provider: "zai", token: legacyToken } : null;
+      return legacyToken ? [{ provider: "zai", token: legacyToken }] : [];
     }
     case "minimax": {
       const apiKey = resolveProviderApiKeyFromConfigAndStore({
@@ -210,7 +214,7 @@ async function resolveProviderUsageAuthFallback(params: {
         providerIds: ["minimax"],
         envDirect: [params.state.env.MINIMAX_CODE_PLAN_KEY, params.state.env.MINIMAX_API_KEY],
       });
-      return apiKey ? { provider: "minimax", token: apiKey } : null;
+      return apiKey ? [{ provider: "minimax", token: apiKey }] : [];
     }
     case "xiaomi": {
       const apiKey = resolveProviderApiKeyFromConfigAndStore({
@@ -218,10 +222,10 @@ async function resolveProviderUsageAuthFallback(params: {
         providerIds: ["xiaomi"],
         envDirect: [params.state.env.XIAOMI_API_KEY],
       });
-      return apiKey ? { provider: "xiaomi", token: apiKey } : null;
+      return apiKey ? [{ provider: "xiaomi", token: apiKey }] : [];
     }
     default:
-      return null;
+      return [];
   }
 }
 
@@ -255,13 +259,11 @@ export async function resolveProviderAuths(params: {
       auths.push(pluginAuth);
       continue;
     }
-    const fallbackAuth = await resolveProviderUsageAuthFallback({
+    const fallbackAuths = await resolveProviderUsageAuthFallback({
       state,
       provider,
     });
-    if (fallbackAuth) {
-      auths.push(fallbackAuth);
-    }
+    auths.push(...fallbackAuths);
   }
 
   return auths;

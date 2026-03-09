@@ -99,7 +99,7 @@ describe("markdownToTelegramHtml", () => {
 
   it("renders thematic breaks as the custom visual separator", () => {
     const res = markdownToTelegramHtml("foo\n\n---\n\nbar");
-    expect(res).toBe("foo\n\n◆◆◆◆◆◆◆◆◆\n\nbar");
+    expect(res).toBe("foo\n\n• • • • • • • • •\n\nbar");
   });
 
   it("compresses excessive blank lines after formatting", () => {
