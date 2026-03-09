@@ -2763,6 +2763,69 @@ describe("dispatchReplyFromConfig", () => {
     expect(blockReplySentTexts).not.toContain("Reasoning:\n_thinking..._");
     expect(blockReplySentTexts).toContain("The answer is 42");
   });
+
+  it("forces final-only delivery for telegram and whatsapp block streaming", async () => {
+    setNoAbort();
+
+    for (const provider of ["telegram", "whatsapp"] as const) {
+      const dispatcher = createDispatcher();
+      const ctx = buildTestCtx({
+        Provider: provider,
+        Surface: provider,
+        From: `${provider}:from`,
+        To: `${provider}:to`,
+      });
+      let disableBlockStreaming: boolean | undefined;
+      const replyResolver = async (
+        _ctx: MsgContext,
+        opts?: GetReplyOptions,
+      ): Promise<ReplyPayload> => {
+        disableBlockStreaming = opts?.disableBlockStreaming;
+        if (opts?.disableBlockStreaming !== true) {
+          await opts?.onBlockReply?.({ text: "intermediate chunk" });
+        }
+        return { text: `final ${provider}` };
+      };
+
+      await dispatchReplyFromConfig({ ctx, cfg: emptyConfig, dispatcher, replyResolver });
+
+      expect(disableBlockStreaming).toBe(true);
+      expect(dispatcher.sendBlockReply).not.toHaveBeenCalled();
+      expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
+        expect.objectContaining({ text: `final ${provider}` }),
+      );
+    }
+  });
+
+  it("does not force-disable block streaming for other channels", async () => {
+    setNoAbort();
+    const dispatcher = createDispatcher();
+    const ctx = buildTestCtx({
+      Provider: "slack",
+      Surface: "slack",
+      From: "slack:from",
+      To: "slack:to",
+    });
+    let disableBlockStreaming: boolean | undefined;
+    const replyResolver = async (
+      _ctx: MsgContext,
+      opts?: GetReplyOptions,
+    ): Promise<ReplyPayload> => {
+      disableBlockStreaming = opts?.disableBlockStreaming;
+      await opts?.onBlockReply?.({ text: "chunk" });
+      return { text: "final slack" };
+    };
+
+    await dispatchReplyFromConfig({ ctx, cfg: emptyConfig, dispatcher, replyResolver });
+
+    expect(disableBlockStreaming).toBeUndefined();
+    expect(dispatcher.sendBlockReply).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "chunk" }),
+    );
+    expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "final slack" }),
+    );
+  });
 });
 
 describe("before_dispatch hook", () => {

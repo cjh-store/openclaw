@@ -267,6 +267,8 @@ export async function dispatchReplyFromConfig(params: {
   const shouldSuppressTyping =
     shouldRouteToOriginating || originatingChannel === INTERNAL_MESSAGE_CHANNEL;
   const ttsChannel = shouldRouteToOriginating ? originatingChannel : currentSurface;
+  const shouldDisableExternalBlockStreaming =
+    ttsChannel === "telegram" || ttsChannel === "whatsapp";
 
   /**
    * Helper to send a payload via route-reply (async).
@@ -665,6 +667,11 @@ export async function dispatchReplyFromConfig(params: {
         ...params.replyOptions,
         typingPolicy: typing.typingPolicy,
         suppressTyping: typing.suppressTyping,
+        // External messaging surfaces should only receive final replies.
+        disableBlockStreaming:
+          shouldDisableExternalBlockStreaming || params.replyOptions?.disableBlockStreaming === true
+            ? true
+            : params.replyOptions?.disableBlockStreaming,
         onToolResult: (payload: ReplyPayload) => {
           const run = async () => {
             const ttsPayload = await maybeApplyTtsToPayload({

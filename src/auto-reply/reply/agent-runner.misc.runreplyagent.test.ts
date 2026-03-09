@@ -88,6 +88,12 @@ type RunWithModelFallbackParams = {
   run: (provider: string, model: string) => Promise<unknown>;
 };
 
+function expectTextBodyWithFooter(result: unknown, body: string, modelLine: string) {
+  expect(result).toMatchObject({
+    text: `${body}\n\n-------------\n🧠 ${modelLine}`,
+  });
+}
+
 beforeEach(() => {
   runEmbeddedPiAgentMock.mockClear();
   runCliAgentMock.mockClear();
@@ -217,7 +223,7 @@ describe("runReplyAgent onAgentRunStart", () => {
 
     expect(onAgentRunStart).toHaveBeenCalledTimes(1);
     expect(onAgentRunStart).toHaveBeenCalledWith("run-started");
-    expect(result).toMatchObject({ text: "ok" });
+    expectTextBodyWithFooter(result, "ok", "claude-cli/opus-4.5");
   });
 });
 
@@ -1035,7 +1041,7 @@ describe("runReplyAgent block streaming", () => {
     const result = await resultPromise;
 
     expect(sawAbort).toBe(true);
-    expect(result).toMatchObject({ text: "Final message" });
+    expectTextBodyWithFooter(result, "Final message", "anthropic/claude");
   });
 });
 
@@ -1130,7 +1136,7 @@ describe("runReplyAgent claude-cli routing", () => {
     expect(runCliAgentMock).toHaveBeenCalledTimes(1);
     expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
     expect(lifecyclePhases).toEqual(["start", "end"]);
-    expect(result).toMatchObject({ text: "ok" });
+    expectTextBodyWithFooter(result, "ok", "claude-cli/opus-4.5");
   });
 });
 
@@ -1221,7 +1227,7 @@ describe("runReplyAgent messaging tool suppression", () => {
 
     const result = await createRun("slack");
 
-    expect(result).toMatchObject({ text: "hello world!" });
+    expectTextBodyWithFooter(result, "hello world!", "anthropic/claude");
   });
 
   it("keeps final reply when text matches a cross-target messaging send", async () => {
@@ -1234,7 +1240,7 @@ describe("runReplyAgent messaging tool suppression", () => {
 
     const result = await createRun("slack");
 
-    expect(result).toMatchObject({ text: "hello world!" });
+    expectTextBodyWithFooter(result, "hello world!", "anthropic/claude");
   });
 
   it("delivers replies when account ids do not match", async () => {
@@ -1254,7 +1260,7 @@ describe("runReplyAgent messaging tool suppression", () => {
 
     const result = await createRun("slack");
 
-    expect(result).toMatchObject({ text: "hello world!" });
+    expectTextBodyWithFooter(result, "hello world!", "anthropic/claude");
   });
 
   it("persists usage fields even when replies are suppressed", async () => {
@@ -1428,9 +1434,11 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun();
-    expect(result).toMatchObject({
-      text: "I'll remind you tomorrow morning.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
-    });
+    expectTextBodyWithFooter(
+      result,
+      "I'll remind you tomorrow morning.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
+      "anthropic/claude",
+    );
   });
 
   it("keeps reminder commitment unchanged when cron.add succeeded", async () => {
@@ -1441,9 +1449,7 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun();
-    expect(result).toMatchObject({
-      text: "I'll remind you tomorrow morning.",
-    });
+    expectTextBodyWithFooter(result, "I'll remind you tomorrow morning.", "anthropic/claude");
   });
 
   it("suppresses guard note when session already has an active cron job", async () => {
@@ -1468,9 +1474,7 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun();
-    expect(result).toMatchObject({
-      text: "I'll ping you when it's done.",
-    });
+    expectTextBodyWithFooter(result, "I'll ping you when it's done.", "anthropic/claude");
   });
 
   it("still appends guard note when cron jobs exist but not for the current session", async () => {
@@ -1495,9 +1499,11 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun();
-    expect(result).toMatchObject({
-      text: "I'll remind you tomorrow morning.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
-    });
+    expectTextBodyWithFooter(
+      result,
+      "I'll remind you tomorrow morning.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
+      "anthropic/claude",
+    );
   });
 
   it("still appends guard note when cron jobs for session exist but are disabled", async () => {
@@ -1522,9 +1528,11 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun();
-    expect(result).toMatchObject({
-      text: "I'll check back in an hour.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
-    });
+    expectTextBodyWithFooter(
+      result,
+      "I'll check back in an hour.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
+      "anthropic/claude",
+    );
   });
 
   it("still appends guard note when sessionKey is missing", async () => {
@@ -1549,9 +1557,11 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun({ omitSessionKey: true });
-    expect(result).toMatchObject({
-      text: "I'll ping you later.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
-    });
+    expectTextBodyWithFooter(
+      result,
+      "I'll ping you later.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
+      "anthropic/claude",
+    );
   });
 
   it("still appends guard note when cron store read fails", async () => {
@@ -1564,9 +1574,11 @@ describe("runReplyAgent reminder commitment guard", () => {
     });
 
     const result = await createRun({ sessionKey: "main" });
-    expect(result).toMatchObject({
-      text: "I'll remind you after lunch.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
-    });
+    expectTextBodyWithFooter(
+      result,
+      "I'll remind you after lunch.\n\nNote: I did not schedule a reminder in this turn, so this will not trigger automatically.",
+      "anthropic/claude",
+    );
   });
 });
 
@@ -1871,7 +1883,7 @@ describe("runReplyAgent response usage footer", () => {
     });
 
     const payload = Array.isArray(res) ? res[0] : res;
-    expect(String(payload?.text ?? "")).toContain("\n🧠 openai-codex/gpt-5.4");
+    expect(String(payload?.text ?? "")).toContain("\n\n-------------\n🧠 openai-codex/gpt-5.4");
   });
 
   it("adds a model footer for internal webchat replies", async () => {
@@ -1944,7 +1956,7 @@ describe("runReplyAgent response usage footer", () => {
     });
 
     const payload = Array.isArray(res) ? res[0] : res;
-    expect(String(payload?.text ?? "")).toContain("\n🧠 openai-codex/gpt-5.4");
+    expect(String(payload?.text ?? "")).toContain("\n\n-------------\n🧠 openai-codex/gpt-5.4");
   });
 });
 

@@ -140,3 +140,15 @@ changelog/fragments/
 
 # Local scratch workspace
 .tmp/
+
+# --- AI RULES START ---
+# Ignore all dotfiles except specific folders/files
+.*
+!.vscode/
+!.github/
+!.gitignore
+.vscode/mcp.json
+.github/copilot-instructions.md
+
+CLAUDE.md
+# --- AI RULES END ---

@@ -92,6 +92,32 @@ export const formatBunFetchSocketError = (message: string) => {
   ].join("\n");
 };
 
+export const appendModelLine = (payloads: ReplyPayload[], modelRef?: string): ReplyPayload[] => {
+  if (!modelRef) {
+    return payloads;
+  }
+  const separatorLine = "-------------";
+  let index = -1;
+  for (let i = payloads.length - 1; i >= 0; i -= 1) {
+    if (payloads[i]?.text) {
+      index = i;
+      break;
+    }
+  }
+  if (index === -1) {
+    return [...payloads, { text: `${separatorLine}\n🧠 ${modelRef}` }];
+  }
+  const existing = payloads[index];
+  const existingText = existing.text ?? "";
+  const separator = existingText.endsWith("\n") ? "\n" : "\n\n";
+  const next = {
+    ...existing,
+    text: `${existingText}${separator}${separatorLine}\n🧠 ${modelRef}`,
+  };
+  const updated = payloads.slice();
+  updated[index] = next;
+  return updated;
+};
 export const resolveEnforceFinalTag = (run: FollowupRun["run"], provider: string) =>
   Boolean(run.enforceFinalTag || isReasoningTagProvider(provider));
 
