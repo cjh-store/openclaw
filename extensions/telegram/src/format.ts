@@ -71,7 +71,7 @@ function renderTelegramHtml(ir: MarkdownIR): string {
   });
 }
 
-const TELEGRAM_RULE_SEPARATOR = "• • • • • • • • •";
+const TELEGRAM_RULE_SEPARATOR = "-------------";
 
 function rewriteTelegramBlockquotes(html: string): string {
   const withSeparatedBlocks = html.replace(

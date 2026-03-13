@@ -96,7 +96,7 @@ export const appendModelLine = (payloads: ReplyPayload[], modelRef?: string): Re
   if (!modelRef) {
     return payloads;
   }
-  const separatorLine = "-------------";
+  const separatorLine = "⊹ ⊹ ⊹ ⊹ ⊹ ⊹ ⊹";
   let index = -1;
   for (let i = payloads.length - 1; i >= 0; i -= 1) {
     if (payloads[i]?.text) {
