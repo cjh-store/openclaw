@@ -47,10 +47,10 @@ export function handleAgentEnd(ctx: EmbeddedPiSubscribeContext) {
     });
     const rawError = lastAssistant.errorMessage?.trim();
     const failoverReason = classifyFailoverReason(rawError ?? "");
-    const errorText = (friendlyError || lastAssistant.errorMessage || "LLM request failed.").trim();
+    const errorText = (friendlyError || lastAssistant.errorMessage || "LLM 请求失败。").trim();
     const observedError = buildApiErrorObservationFields(rawError);
     const safeErrorText =
-      buildTextObservationFields(errorText).textPreview ?? "LLM request failed.";
+      buildTextObservationFields(errorText).textPreview ?? "LLM 请求失败。";
     const safeRunId = sanitizeForConsole(ctx.params.runId) ?? "-";
     const safeModel = sanitizeForConsole(lastAssistant.model) ?? "unknown";
     const safeProvider = sanitizeForConsole(lastAssistant.provider) ?? "unknown";

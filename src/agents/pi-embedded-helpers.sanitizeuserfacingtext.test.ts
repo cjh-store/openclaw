@@ -24,7 +24,7 @@ describe("sanitizeUserFacingText", () => {
 
   it("sanitizes role ordering errors", () => {
     const result = sanitizeUserFacingText("400 Incorrect role information", { errorContext: true });
-    expect(result).toContain("Message ordering conflict");
+    expect(result).toContain("消息顺序冲突");
   });
 
   it("sanitizes HTTP status errors with error hints", () => {
@@ -37,9 +37,7 @@ describe("sanitizeUserFacingText", () => {
     "Context overflow: prompt too large for the model. Try /reset (or /new) to start a fresh session, or use a larger-context model.",
     "Request size exceeds model context window",
   ])("sanitizes direct context-overflow error: %s", (text) => {
-    expect(sanitizeUserFacingText(text, { errorContext: true })).toContain(
-      "Context overflow: prompt too large for the model.",
-    );
+    expect(sanitizeUserFacingText(text, { errorContext: true })).toContain("上下文溢出");
   });
 
   it("sanitizes Ollama prompt-too-long payloads through the context-overflow path", () => {
@@ -72,7 +70,7 @@ describe("sanitizeUserFacingText", () => {
 
   it("rewrites billing error-shaped text with errorContext", () => {
     const text = "billing: please upgrade your plan";
-    expect(sanitizeUserFacingText(text, { errorContext: true })).toContain("billing error");
+    expect(sanitizeUserFacingText(text, { errorContext: true })).toContain("账单错误");
   });
 
   it("sanitizes raw API error payloads", () => {
@@ -124,7 +122,7 @@ describe("sanitizeUserFacingText", () => {
 
   it("returns a friendly message for rate limit errors in Error: prefixed payloads", () => {
     expect(sanitizeUserFacingText("Error: 429 Rate limit exceeded", { errorContext: true })).toBe(
-      "⚠️ API rate limit reached. Please try again later.",
+      "⚠️ API 请求频率超限，请稍后再试。",
     );
   });
 

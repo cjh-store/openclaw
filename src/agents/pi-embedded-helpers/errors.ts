@@ -47,16 +47,15 @@ export function formatBillingErrorMessage(provider?: string, model?: string): st
   const providerLabel =
     providerName && modelName ? `${providerName} (${modelName})` : providerName || undefined;
   if (providerLabel) {
-    return `⚠️ ${providerLabel} returned a billing error — your API key has run out of credits or has an insufficient balance. Check your ${providerName} billing dashboard and top up or switch to a different API key.`;
+    return `⚠️ ${providerLabel} 返回账单错误 — 你的 API 密钥额度已用完或余额不足。请检查 ${providerName} 的账单页面，充值或切换其他 API 密钥。`;
   }
-  return "⚠️ API provider returned a billing error — your API key has run out of credits or has an insufficient balance. Check your provider's billing dashboard and top up or switch to a different API key.";
+  return "⚠️ API 提供商返回账单错误 — 你的 API 密钥额度已用完或余额不足。请检查提供商的账单页面，充值或切换其他 API 密钥。";
 }
 
 export const BILLING_ERROR_USER_MESSAGE = formatBillingErrorMessage();
 
-const RATE_LIMIT_ERROR_USER_MESSAGE = "⚠️ API rate limit reached. Please try again later.";
-const OVERLOADED_ERROR_USER_MESSAGE =
-  "The AI service is temporarily overloaded. Please try again in a moment.";
+const RATE_LIMIT_ERROR_USER_MESSAGE = "⚠️ API 请求频率超限，请稍后再试。";
+const OVERLOADED_ERROR_USER_MESSAGE = "⚠️ AI 服务暂时过载，请稍后再试。";
 
 /**
  * Check whether the raw rate-limit error contains provider-specific details
@@ -628,7 +627,8 @@ function shouldRewriteRawPayloadWithoutErrorContext(raw: string): boolean {
   if (raw.length > NON_ERROR_PROVIDER_PAYLOAD_MAX_LENGTH) {
     return false;
   }
-  if (!NON_ERROR_PROVIDER_PAYLOAD_PREFIX_RE.test(raw)) {
+  const leadingStatus = extractLeadingHttpStatus(raw.trim());
+  if (leadingStatus && isCloudflareOrHtmlErrorPage(raw.trim())) {
     return false;
   }
   const info = parseApiErrorInfo(raw);
@@ -657,7 +657,7 @@ export function formatAssistantErrorText(
     return undefined;
   }
   if (!raw) {
-    return "LLM request failed with an unknown error.";
+    return "LLM 请求失败，未知错误。";
   }
 
   const unknownTool =
@@ -676,16 +676,13 @@ export function formatAssistantErrorText(
 
   if (isContextOverflowError(raw)) {
     return (
-      "Context overflow: prompt too large for the model. " +
-      "Try /reset (or /new) to start a fresh session, or use a larger-context model."
+      "上下文溢出：提示词对模型来说太大了。" +
+      "请用 /reset（或 /new）开始新会话，或使用支持更大上下文的模型。"
     );
   }
 
   if (isReasoningConstraintErrorMessage(raw)) {
-    return (
-      "Reasoning is required for this model endpoint. " +
-      "Use /think minimal (or any non-off level) and try again."
-    );
+    return "该模型要求启用推理模式。" + "请使用 /think minimal（或其他非 off 级别）后重试。";
   }
 
   // Catch role ordering errors - including JSON-wrapped and "400" prefix variants
@@ -694,23 +691,20 @@ export function formatAssistantErrorText(
       raw,
     )
   ) {
-    return (
-      "Message ordering conflict - please try again. " +
-      "If this persists, use /new to start a fresh session."
-    );
+    return "消息顺序冲突 - 请重试。" + "如果持续出现，请用 /new 开始新会话。";
   }
 
   if (isMissingToolCallInputError(raw)) {
     return (
-      "Session history looks corrupted (tool call input missing). " +
-      "Use /new to start a fresh session. " +
-      "If this keeps happening, reset the session or delete the corrupted session transcript."
+      "会话历史损坏（工具调用输入缺失）。" +
+      "请用 /new 开始新会话。" +
+      "如果问题持续，请重置会话或删除损坏的会话记录。"
     );
   }
 
   const invalidRequest = raw.match(/"type":"invalid_request_error".*?"message":"([^"]+)"/);
   if (invalidRequest?.[1]) {
-    return `LLM request rejected: ${invalidRequest[1]}`;
+    return `LLM 请求被拒绝：${invalidRequest[1]}`;
   }
 
   const transientCopy = formatRateLimitOrOverloadedErrorCopy(raw);
@@ -724,11 +718,19 @@ export function formatAssistantErrorText(
   }
 
   if (isTimeoutErrorMessage(raw)) {
-    return "LLM request timed out.";
+    return "LLM 请求超时。";
   }
 
   if (isBillingErrorMessage(raw)) {
     return formatBillingErrorMessage(opts?.provider, opts?.model ?? msg.model);
+  }
+
+  if (isAuthPermanentErrorMessage(raw)) {
+    return `⚠️ API 认证永久失败 — 账户或工作区已被停用。请检查你的 API 提供商账户状态，或切换其他密钥。`;
+  }
+
+  if (isAuthErrorMessage(raw)) {
+    return `⚠️ API 认证失败 — 密钥无效或已过期。请检查密钥配置或重新登录。`;
   }
 
   if (isLikelyHttpErrorText(raw) || isRawApiErrorPayload(raw)) {
@@ -763,16 +765,13 @@ export function sanitizeUserFacingText(text: string, opts?: { errorContext?: boo
   // Otherwise we risk swallowing legitimate assistant text that merely *mentions* these errors.
   if (errorContext) {
     if (/incorrect role information|roles must alternate/i.test(trimmed)) {
-      return (
-        "Message ordering conflict - please try again. " +
-        "If this persists, use /new to start a fresh session."
-      );
+      return "消息顺序冲突 - 请重试。" + "如果持续出现，请用 /new 开始新会话。";
     }
 
     if (shouldRewriteContextOverflowText(trimmed)) {
       return (
-        "Context overflow: prompt too large for the model. " +
-        "Try /reset (or /new) to start a fresh session, or use a larger-context model."
+        "上下文溢出：提示词对模型来说太大了。" +
+        "请用 /reset（或 /new）开始新会话，或使用支持更大上下文的模型。"
       );
     }
 
@@ -794,7 +793,7 @@ export function sanitizeUserFacingText(text: string, opts?: { errorContext?: boo
         return transportCopy;
       }
       if (isTimeoutErrorMessage(trimmed)) {
-        return "LLM request timed out.";
+        return "LLM 请求超时。";
       }
       return formatRawAssistantErrorForUi(trimmed);
     }

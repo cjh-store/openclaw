@@ -9,8 +9,7 @@ import {
 } from "./payloads.test-helpers.js";
 
 describe("buildEmbeddedRunPayloads", () => {
-  const OVERLOADED_FALLBACK_TEXT =
-    "The AI service is temporarily overloaded. Please try again in a moment.";
+  const OVERLOADED_FALLBACK_TEXT = "⚠️ AI 服务暂时过载，请稍后再试。";
   const errorJson =
     '{"type":"error","error":{"details":null,"type":"overloaded_error","message":"Overloaded"},"request_id":"req_011CX7DwS7tSvggaNHmefwWg"}';
   const errorJsonPretty = `{

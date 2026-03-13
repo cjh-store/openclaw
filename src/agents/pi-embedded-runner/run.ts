@@ -947,8 +947,8 @@ export async function runEmbeddedPiAgent(
               payloads: [
                 {
                   text:
-                    "Context overflow: prompt too large for the model. " +
-                    "Try /reset (or /new) to start a fresh session, or use a larger-context model.",
+                    "上下文溢出：提示词对模型来说太大了。" +
+                    "请用 /reset（或 /new）开始新会话，或使用支持更大上下文的模型。",
                   isError: true,
                 },
               ],
@@ -990,9 +990,7 @@ export async function runEmbeddedPiAgent(
               return {
                 payloads: [
                   {
-                    text:
-                      "Message ordering conflict - please try again. " +
-                      "If this persists, use /new to start a fresh session.",
+                    text: "消息顺序冲突 - 请重试。" + "如果持续出现，请用 /new 开始新会话。",
                     isError: true,
                   },
                 ],
@@ -1226,17 +1224,17 @@ export async function runEmbeddedPiAgent(
                   : undefined) ||
                 lastAssistant?.errorMessage?.trim() ||
                 (timedOut
-                  ? "LLM request timed out."
+                  ? "LLM 请求超时。"
                   : rateLimitFailure
-                    ? "LLM request rate limited."
+                    ? "LLM 请求频率超限。"
                     : billingFailure
                       ? formatBillingErrorMessage(
                           activeErrorContext.provider,
                           activeErrorContext.model,
                         )
                       : authFailure
-                        ? "LLM request unauthorized."
-                        : "LLM request failed.");
+                        ? "LLM 请求认证失败。"
+                        : "LLM 请求失败。");
               const status =
                 resolveFailoverStatus(assistantFailoverReason ?? "unknown") ??
                 (isTimeoutErrorMessage(message) ? 408 : undefined);

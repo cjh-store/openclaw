@@ -19,7 +19,7 @@ describe("formatAssistantErrorText", () => {
 
   it("returns a friendly message for context overflow", () => {
     const msg = makeAssistantError("request_too_large");
-    expect(formatAssistantErrorText(msg)).toContain("Context overflow");
+    expect(formatAssistantErrorText(msg)).toContain("上下文溢出");
   });
   it("returns context overflow for Anthropic 'Request size exceeds model context window'", () => {
     // This is the new Anthropic error format that wasn't being detected.
@@ -29,13 +29,13 @@ describe("formatAssistantErrorText", () => {
     const msg = makeAssistantError(
       '{"type":"error","error":{"type":"invalid_request_error","message":"Request size exceeds model context window"}}',
     );
-    expect(formatAssistantErrorText(msg)).toContain("Context overflow");
+    expect(formatAssistantErrorText(msg)).toContain("上下文溢出");
   });
   it("returns context overflow for Kimi 'model token limit' errors", () => {
     const msg = makeAssistantError(
       "error, status code: 400, message: Invalid request: Your request exceeded model token limit: 262144 (requested: 291351)",
     );
-    expect(formatAssistantErrorText(msg)).toContain("Context overflow");
+    expect(formatAssistantErrorText(msg)).toContain("上下文溢出");
   });
   it("returns context overflow for Ollama 'prompt too long' errors (#34005)", () => {
     const msg = makeAssistantError(
@@ -48,32 +48,30 @@ describe("formatAssistantErrorText", () => {
       "400 Reasoning is mandatory for this endpoint and cannot be disabled.",
     );
     const result = formatAssistantErrorText(msg);
-    expect(result).toContain("Reasoning is required");
+    expect(result).toContain("推理模式");
     expect(result).toContain("/think minimal");
-    expect(result).not.toContain("Context overflow");
+    expect(result).not.toContain("上下文溢出");
   });
   it("returns a friendly message for Anthropic role ordering", () => {
     const msg = makeAssistantError('messages: roles must alternate between "user" and "assistant"');
-    expect(formatAssistantErrorText(msg)).toContain("Message ordering conflict");
+    expect(formatAssistantErrorText(msg)).toContain("消息顺序冲突");
   });
   it("returns a friendly message for Anthropic overload errors", () => {
     const msg = makeAssistantError(
       '{"type":"error","error":{"details":null,"type":"overloaded_error","message":"Overloaded"},"request_id":"req_123"}',
     );
-    expect(formatAssistantErrorText(msg)).toBe(
-      "The AI service is temporarily overloaded. Please try again in a moment.",
-    );
+    expect(formatAssistantErrorText(msg)).toBe("⚠️ AI 服务暂时过载，请稍后再试。");
   });
   it("returns a recovery hint when tool call input is missing", () => {
     const msg = makeAssistantError("tool_use.input: Field required");
     const result = formatAssistantErrorText(msg);
-    expect(result).toContain("Session history looks corrupted");
+    expect(result).toContain("会话历史损坏");
     expect(result).toContain("/new");
   });
   it("handles JSON-wrapped role errors", () => {
     const msg = makeAssistantError('{"error":{"message":"400 Incorrect role information"}}');
     const result = formatAssistantErrorText(msg);
-    expect(result).toContain("Message ordering conflict");
+    expect(result).toContain("消息顺序冲突");
     expect(result).not.toContain("400");
   });
   it("suppresses raw error JSON payloads that are not otherwise classified", () => {
@@ -108,7 +106,7 @@ describe("formatAssistantErrorText", () => {
     const result = formatAssistantErrorText(msg, { provider: "Anthropic" });
     expect(result).toBe(formatBillingErrorMessage("Anthropic", "test-model"));
     expect(result).toContain("Anthropic");
-    expect(result).not.toContain("API provider");
+    expect(result).not.toContain("API 提供商返回账单错误");
   });
   it("uses the active assistant model for billing message context", () => {
     const msg = makeAssistantError("insufficient credits");
@@ -119,12 +117,12 @@ describe("formatAssistantErrorText", () => {
   it("returns generic billing message when provider is not given", () => {
     const msg = makeAssistantError("insufficient credits");
     const result = formatAssistantErrorText(msg);
-    expect(result).toContain("API provider");
+    expect(result).toContain("API 提供商");
     expect(result).toBe(BILLING_ERROR_USER_MESSAGE);
   });
   it("returns a friendly message for rate limit errors", () => {
     const msg = makeAssistantError("429 rate limit reached");
-    expect(formatAssistantErrorText(msg)).toContain("rate limit reached");
+    expect(formatAssistantErrorText(msg)).toContain("请求频率超限");
   });
 
   it("surfaces provider-specific rate limit message with reset time (#54433)", () => {
@@ -181,7 +179,7 @@ describe("formatAssistantErrorText", () => {
 
   it("returns a friendly message for empty stream chunk errors", () => {
     const msg = makeAssistantError("request ended without sending any chunks");
-    expect(formatAssistantErrorText(msg)).toBe("LLM request timed out.");
+    expect(formatAssistantErrorText(msg)).toBe("LLM 请求超时。");
   });
 
   it("returns a connection-refused message for ECONNREFUSED failures", () => {
@@ -219,7 +217,7 @@ describe("formatRawAssistantErrorForUi", () => {
   });
 
   it("renders a generic unknown error message when raw is empty", () => {
-    expect(formatRawAssistantErrorForUi("")).toContain("unknown error");
+    expect(formatRawAssistantErrorForUi("")).toContain("未知错误");
   });
 
   it("formats plain HTTP status lines", () => {
@@ -240,7 +238,7 @@ describe("formatRawAssistantErrorForUi", () => {
 </html>`;
 
     expect(formatRawAssistantErrorForUi(htmlError)).toBe(
-      "The AI service is temporarily unavailable (HTTP 521). Please try again in a moment.",
+      "AI 服务暂时不可用（HTTP 521），请稍后再试。",
     );
   });
 });
