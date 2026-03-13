@@ -13,6 +13,8 @@ const OPENAI_RATE_LIMIT_MESSAGE =
 // Anthropic overloaded_error example shape: https://docs.anthropic.com/en/api/errors
 const ANTHROPIC_OVERLOADED_PAYLOAD =
   '{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_test"}';
+const ANYROUTER_OVERLOADED_500_MESSAGE =
+  "HTTP 500 new_api_error: 当前模型 claude-opus-4-6 负载已经达到上限，请稍后重试 (request id: 20260310231434585332162TQONvGmU)";
 // Gemini RESOURCE_EXHAUSTED troubleshooting example: https://ai.google.dev/gemini-api/docs/troubleshooting
 const GEMINI_RESOURCE_EXHAUSTED_MESSAGE =
   "RESOURCE_EXHAUSTED: Resource has been exhausted (e.g. check quota).";
@@ -260,6 +262,12 @@ describe("failover-error", () => {
     expect(
       resolveFailoverReasonFromError({
         message: ANTHROPIC_OVERLOADED_PAYLOAD,
+      }),
+    ).toBe("overloaded");
+    expect(
+      resolveFailoverReasonFromError({
+        status: 500,
+        message: ANYROUTER_OVERLOADED_500_MESSAGE,
       }),
     ).toBe("overloaded");
   });

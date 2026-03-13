@@ -28,6 +28,8 @@ const GEMINI_RESOURCE_EXHAUSTED_MESSAGE =
 // Anthropic overloaded_error example shape: https://docs.anthropic.com/en/api/errors
 const ANTHROPIC_OVERLOADED_PAYLOAD =
   '{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_test"}';
+const ANYROUTER_OVERLOADED_500_MESSAGE =
+  "HTTP 500 new_api_error: 当前模型 claude-opus-4-6 负载已经达到上限，请稍后重试 (request id: 20260310231434585332162TQONvGmU)";
 // OpenRouter 402 billing example: https://openrouter.ai/docs/api-reference/errors
 const OPENROUTER_CREDITS_MESSAGE = "Payment Required: insufficient credits";
 // Issue-backed Anthropic/OpenAI-compatible insufficient_quota payload under HTTP 400:
@@ -865,6 +867,7 @@ describe("classifyFailoverReason", () => {
         "This model is currently experiencing high demand. Please try again later.",
       ),
     ).toBe("overloaded");
+    expect(classifyFailoverReason(ANYROUTER_OVERLOADED_500_MESSAGE)).toBe("overloaded");
     // "service unavailable" combined with overload/capacity indicator → overloaded
     // (exercises the new regex — none of the standalone patterns match here)
     expect(classifyFailoverReason("service unavailable due to capacity limits")).toBe("overloaded");

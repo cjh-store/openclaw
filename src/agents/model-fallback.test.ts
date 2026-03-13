@@ -180,6 +180,8 @@ const OPENAI_RATE_LIMIT_MESSAGE =
 // Anthropic overloaded_error example shape: https://docs.anthropic.com/en/api/errors
 const ANTHROPIC_OVERLOADED_PAYLOAD =
   '{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_test"}';
+const ANYROUTER_OVERLOADED_500_MESSAGE =
+  "HTTP 500 new_api_error: 当前模型 claude-opus-4-6 负载已经达到上限，请稍后重试 (request id: 20260310231434585332162TQONvGmU)";
 // Issue-backed Anthropic/OpenAI-compatible insufficient_quota payload under HTTP 400:
 // https://github.com/openclaw/openclaw/issues/23440
 const INSUFFICIENT_QUOTA_PAYLOAD =
@@ -932,6 +934,14 @@ describe("runWithModelFallback", () => {
       provider: "openai",
       model: "gpt-4.1-mini",
       firstError: new Error(ANTHROPIC_OVERLOADED_PAYLOAD),
+    });
+  });
+
+  it("falls back on anyrouter overload messages wrapped in HTTP 500", async () => {
+    await expectFallsBackToHaiku({
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      firstError: Object.assign(new Error(ANYROUTER_OVERLOADED_500_MESSAGE), { status: 500 }),
     });
   });
 

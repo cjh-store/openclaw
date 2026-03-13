@@ -19,6 +19,7 @@ const ERROR_PATTERNS = {
   overloaded: [
     /overloaded_error|"type"\s*:\s*"overloaded_error"/i,
     "overloaded",
+    /负载.*达到上限|已达到负载上限|模型.*达到上限.*请稍后重试/i,
     // Match "service unavailable" only when combined with an explicit overload
     // indicator — a generic 503 from a proxy/CDN should not be classified as
     // provider-overload (#32828).
@@ -81,6 +82,7 @@ const ERROR_PATTERNS = {
     "key has been disabled",
     "key has been revoked",
     "account has been deactivated",
+    "deactivated_workspace",
     /could not (?:authenticate|validate).*(?:api[_ ]?key|credentials)/i,
     "permission_error",
     "not allowed for this organization",
