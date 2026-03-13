@@ -421,6 +421,44 @@ describe("runGatewayLoop", () => {
       );
     });
   });
+
+  it("exits instead of falling back in-process when launchd SIGTERM arrives during restart", async () => {
+    vi.clearAllMocks();
+
+    await withIsolatedSignals(async () => {
+      const closeFirst = vi.fn(async () => {});
+      const start = vi
+        .fn()
+        .mockResolvedValueOnce({ close: closeFirst })
+        .mockRejectedValueOnce(new Error("should-not-restart-in-process"));
+      const runtime = { log: vi.fn(), error: vi.fn(), exit: vi.fn() };
+      const { runGatewayLoop } = await import("./run-loop.js");
+      const _loopPromise = runGatewayLoop({
+        start: start as unknown as Parameters<typeof runGatewayLoop>[0]["start"],
+        runtime: runtime as unknown as Parameters<typeof runGatewayLoop>[0]["runtime"],
+      });
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      restartGatewayProcessWithFreshPid.mockImplementationOnce(() => {
+        process.emit("SIGTERM");
+        return {
+          mode: "failed",
+          detail: "launchctl bootstrap failed: 5: Input/output error",
+        };
+      });
+
+      process.emit("SIGUSR1");
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(runtime.exit).toHaveBeenCalledWith(0);
+      expect(gatewayLog.info).toHaveBeenCalledWith(
+        "received SIGTERM during restart; supervisor takeover detected",
+      );
+      expect(start).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("gateway discover routing helpers", () => {

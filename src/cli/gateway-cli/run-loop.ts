@@ -34,6 +34,8 @@ export async function runGatewayLoop(params: {
   let lock = await acquireGatewayLock({ port: params.lockPort });
   let server: Awaited<ReturnType<typeof startGatewayServer>> | null = null;
   let shuttingDown = false;
+  let shutdownAction: GatewayRunSignalAction | null = null;
+  let supervisorTakeoverRequested = false;
   let restartResolver: (() => void) | null = null;
 
   const cleanupSignals = () => {
@@ -76,6 +78,13 @@ export async function runGatewayLoop(params: {
       exitProcess(0);
       return;
     }
+    if (supervisorTakeoverRequested) {
+      gatewayLog.info(
+        "restart mode: supervisor takeover detected after SIGTERM; exiting current process",
+      );
+      exitProcess(0);
+      return;
+    }
     if (respawn.mode === "failed") {
       gatewayLog.warn(
         `full process restart failed (${respawn.detail ?? "unknown error"}); falling back to in-process restart`,
@@ -88,11 +97,20 @@ export async function runGatewayLoop(params: {
     if (hadLock && !(await reacquireLockForInProcessRestart())) {
       return;
     }
+    if (supervisorTakeoverRequested) {
+      gatewayLog.info("restart mode: supervisor takeover won the race; exiting current process");
+      exitProcess(0);
+      return;
+    }
     shuttingDown = false;
+    shutdownAction = null;
+    supervisorTakeoverRequested = false;
     restartResolver?.();
   };
   const handleStopAfterServerClose = async () => {
     await releaseLockIfHeld();
+    shutdownAction = null;
+    supervisorTakeoverRequested = false;
     exitProcess(0);
   };
 
@@ -102,10 +120,17 @@ export async function runGatewayLoop(params: {
 
   const request = (action: GatewayRunSignalAction, signal: string) => {
     if (shuttingDown) {
+      if (signal === "SIGTERM" && shutdownAction === "restart") {
+        supervisorTakeoverRequested = true;
+        gatewayLog.info("received SIGTERM during restart; supervisor takeover detected");
+        return;
+      }
       gatewayLog.info(`received ${signal} during shutdown; ignoring`);
       return;
     }
     shuttingDown = true;
+    shutdownAction = action;
+    supervisorTakeoverRequested = false;
     const isRestart = action === "restart";
     gatewayLog.info(`received ${signal}; ${isRestart ? "restarting" : "shutting down"}`);
 
