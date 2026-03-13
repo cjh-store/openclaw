@@ -178,6 +178,7 @@ import {
 } from "./compaction-timeout.js";
 import { pruneProcessedHistoryImages } from "./history-image-prune.js";
 import { detectAndLoadPromptImages } from "./images.js";
+import { rewindRetryGeneratedPrompt } from "./retry-rewind.js";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
 
 export {
@@ -1426,9 +1427,26 @@ export async function runEmbeddedAttempt(
           messages: activeSession.messages,
         });
 
+        // Repair retry leftovers before prompting again. Without this, automatic
+        // retry loops can append the same user turn repeatedly after prompt-side
+        // failures, which leaks duplicate inbound messages into the active branch.
+        const rewoundRetryPrompt = rewindRetryGeneratedPrompt({
+          sessionManager,
+          effectivePrompt,
+          replaceMessages: (messages) => {
+            activeSession.agent.replaceMessages(messages);
+          },
+          runId: params.runId,
+          sessionId: params.sessionId,
+        });
+
         // Repair orphaned trailing user messages so new prompts don't violate role ordering.
         const leafEntry = sessionManager.getLeafEntry();
-        if (leafEntry?.type === "message" && leafEntry.message.role === "user") {
+        if (
+          !rewoundRetryPrompt &&
+          leafEntry?.type === "message" &&
+          leafEntry.message.role === "user"
+        ) {
           if (leafEntry.parentId) {
             sessionManager.branch(leafEntry.parentId);
           } else {
