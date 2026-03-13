@@ -1272,10 +1272,10 @@ describe("buildCommandsMessage", () => {
     } as unknown as OpenClawConfig);
     expect(text).toContain("ℹ️ Slash commands");
     expect(text).toContain("Status");
-    expect(text).toContain("/commands - List all slash commands.");
-    expect(text).toContain("/skill - Run a skill by name.");
-    expect(text).toContain("/think (/thinking, /t) - Set thinking level.");
-    expect(text).toContain("/compact - Compact the session context.");
+    expect(text).toContain("/commands - 列出所有斜杠命令。");
+    expect(text).toContain("/skill - 按名称运行技能。");
+    expect(text).toContain("/think (/thinking, /t) - 设置思考级别。");
+    expect(text).toContain("/compact - 压缩会话上下文。");
     expect(text).not.toContain("/config");
     expect(text).not.toContain("/debug");
   });
@@ -1324,7 +1324,7 @@ describe("buildCommandsMessagePaginated", () => {
     );
     expect(result.text).toContain("ℹ️ Commands (1/");
     expect(result.text).toContain("Session");
-    expect(result.text).toContain("/stop - Stop the current run.");
+    expect(result.text).toContain("/stop - 停止当前运行。");
   });
 
   it("includes plugin commands in the paginated list", async () => {

@@ -13,7 +13,7 @@ function defineDockCommand(plugin: ChannelPlugin): ChatCommandDefinition {
   return defineChatCommand({
     key: `dock:${plugin.id}`,
     nativeName: `dock_${plugin.id}`,
-    description: `Switch to ${plugin.id} for replies.`,
+    description: `切换到 ${plugin.id} 进行回复。`,
     textAliases: [`/dock-${plugin.id}`, `/dock_${plugin.id}`],
     category: "docks",
   });

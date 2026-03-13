@@ -118,14 +118,14 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "help",
       nativeName: "help",
-      description: "Show available commands.",
+      description: "显示可用命令。",
       textAlias: "/help",
       category: "status",
     }),
     defineChatCommand({
       key: "commands",
       nativeName: "commands",
-      description: "List all slash commands.",
+      description: "列出所有斜杠命令。",
       textAlias: "/commands",
       category: "status",
     }),
@@ -148,7 +148,7 @@ export function buildBuiltinChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "skill",
       nativeName: "skill",
-      description: "Run a skill by name.",
+      description: "按名称运行技能。",
       textAlias: "/skill",
       category: "tools",
       args: [
