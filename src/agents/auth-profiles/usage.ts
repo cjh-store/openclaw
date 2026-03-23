@@ -111,7 +111,8 @@ export function resolveProfilesUnavailableReason(params: {
   for (const profileId of params.profileIds) {
     const stats = params.store.usageStats?.[profileId];
     if (!stats) {
-      continue;
+      // No usage stats means this profile has never failed; provider is usable.
+      return null;
     }
 
     const disabledActive = isActiveUnusableWindow(stats.disabledUntil, now);
@@ -123,7 +124,8 @@ export function resolveProfilesUnavailableReason(params: {
 
     const cooldownActive = isActiveUnusableWindow(stats.cooldownUntil, now);
     if (!cooldownActive) {
-      continue;
+      // This profile is healthy (not disabled, not in cooldown); provider is usable.
+      return null;
     }
 
     let recordedReason = false;
