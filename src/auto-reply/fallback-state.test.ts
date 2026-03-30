@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildFallbackNotice,
   resolveActiveFallbackState,
   resolveFallbackTransition,
   type FallbackNoticeState,
@@ -105,5 +106,33 @@ describe("fallback-state", () => {
     expect(resolved.nextState.selectedModel).toBeUndefined();
     expect(resolved.nextState.activeModel).toBeUndefined();
     expect(resolved.nextState.reason).toBeUndefined();
+  });
+
+  it("describes selected-model retries in the fallback notice", () => {
+    const notice = buildFallbackNotice({
+      selectedProvider: "fireworks",
+      selectedModel: "fireworks/minimax-m2p5",
+      activeProvider: "deepinfra",
+      activeModel: "moonshotai/Kimi-K2.5",
+      attempts: [baseAttempt, baseAttempt, baseAttempt, baseAttempt, baseAttempt],
+    });
+
+    expect(notice).toContain("Model Fallback:");
+    expect(notice).toContain("retried 5 times before switching");
+    expect(notice).toContain("deepinfra/moonshotai/Kimi-K2.5");
+  });
+
+  it("uses first-failure wording when no retry happened before fallback", () => {
+    const notice = buildFallbackNotice({
+      selectedProvider: "fireworks",
+      selectedModel: "fireworks/minimax-m2p5",
+      activeProvider: "deepinfra",
+      activeModel: "moonshotai/Kimi-K2.5",
+      attempts: [baseAttempt],
+    });
+
+    expect(notice).toContain(
+      "selected fireworks/minimax-m2p5 failed; switching to a fallback model",
+    );
   });
 });

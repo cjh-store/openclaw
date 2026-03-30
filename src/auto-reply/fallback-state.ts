@@ -43,6 +43,15 @@ function formatFallbackAttemptSummary(attempt: RuntimeFallbackAttempt): string {
   return `${formatProviderModelRef(attempt.provider, attempt.model)} ${formatFallbackAttemptReason(attempt)}`;
 }
 
+function countAttemptsForModel(
+  attempts: RuntimeFallbackAttempt[],
+  provider: string,
+  model: string,
+): number {
+  return attempts.filter((attempt) => attempt.provider === provider && attempt.model === model)
+    .length;
+}
+
 export function buildFallbackReasonSummary(attempts: RuntimeFallbackAttempt[]): string {
   const firstAttempt = attempts[0];
   const firstReason = firstAttempt
@@ -71,7 +80,16 @@ export function buildFallbackNotice(params: {
     return null;
   }
   const reasonSummary = buildFallbackReasonSummary(params.attempts);
-  return `↪️ Model Fallback: ${active} (selected ${selected}; ${reasonSummary})`;
+  const selectedAttemptCount = countAttemptsForModel(
+    params.attempts,
+    params.selectedProvider,
+    params.selectedModel,
+  );
+  const retrySummary =
+    selectedAttemptCount > 1
+      ? `selected ${selected} failed and was retried ${selectedAttemptCount} times before switching`
+      : `selected ${selected} failed; switching to a fallback model`;
+  return `↪️ Model Fallback: ${active} (${retrySummary}; ${reasonSummary})`;
 }
 
 export function buildFallbackClearedNotice(params: {

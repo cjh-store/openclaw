@@ -5,6 +5,7 @@ import {
 } from "../config/model-input.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { sanitizeForLog } from "../terminal/ansi.js";
+import { sleep } from "../utils.js";
 import {
   ensureAuthProfileStore,
   getSoonestCooldownExpiry,
@@ -39,6 +40,8 @@ import type { FailoverReason } from "./pi-embedded-helpers.js";
 import { isLikelyContextOverflowError } from "./pi-embedded-helpers.js";
 
 const log = createSubsystemLogger("model-fallback");
+const PRIMARY_CANDIDATE_MAX_ATTEMPTS = 2;
+const PRIMARY_CANDIDATE_RETRY_DELAY_MS = 200;
 
 /**
  * Structured error thrown when all model fallback candidates have been
@@ -213,6 +216,12 @@ async function runFallbackAttempt<T>(params: {
 
 function sameModelCandidate(a: ModelCandidate, b: ModelCandidate): boolean {
   return a.provider === b.provider && a.model === b.model;
+}
+
+function shouldRetryPrimaryCandidateBeforeFallback(
+  _reason: FailoverReason | null | undefined,
+): boolean {
+  return true;
 }
 
 function throwFallbackFailureSummary(params: {
@@ -617,6 +626,8 @@ export async function runWithModelFallback<T>(params: {
     const isPrimary = i === 0;
     const requestedModel =
       params.provider === candidate.provider && params.model === candidate.model;
+    const maxAttemptsForCandidate = isPrimary ? PRIMARY_CANDIDATE_MAX_ATTEMPTS : 1;
+    let candidateAttempt = 0;
     let runOptions: ModelFallbackRunOptions | undefined;
     let attemptedDuringCooldown = false;
     let transientProbeProviderForAttempt: string | null = null;
@@ -734,39 +745,39 @@ export async function runWithModelFallback<T>(params: {
       }
     }
 
-    const attemptRun = await runFallbackAttempt({
-      run: params.run,
-      ...candidate,
-      attempts,
-      options: runOptions,
-    });
-    if ("success" in attemptRun) {
-      if (i > 0 || attempts.length > 0 || attemptedDuringCooldown) {
-        logModelFallbackDecision({
-          decision: "candidate_succeeded",
-          runId: params.runId,
-          requestedProvider: params.provider,
-          requestedModel: params.model,
-          candidate,
-          attempt: i + 1,
-          total: candidates.length,
-          previousAttempts: attempts,
-          isPrimary,
-          requestedModelMatched: requestedModel,
-          fallbackConfigured: hasFallbackCandidates,
-        });
+    while (candidateAttempt < maxAttemptsForCandidate) {
+      const attemptRun = await runFallbackAttempt({
+        run: params.run,
+        ...candidate,
+        attempts,
+        options: runOptions,
+      });
+      if ("success" in attemptRun) {
+        if (i > 0 || attempts.length > 0 || attemptedDuringCooldown) {
+          logModelFallbackDecision({
+            decision: "candidate_succeeded",
+            runId: params.runId,
+            requestedProvider: params.provider,
+            requestedModel: params.model,
+            candidate,
+            attempt: i + 1,
+            total: candidates.length,
+            previousAttempts: attempts,
+            isPrimary,
+            requestedModelMatched: requestedModel,
+            fallbackConfigured: hasFallbackCandidates,
+          });
+        }
+        const notFoundAttempt =
+          i > 0 ? attempts.find((a) => a.reason === "model_not_found") : undefined;
+        if (notFoundAttempt) {
+          log.warn(
+            `Model "${sanitizeForLog(notFoundAttempt.provider)}/${sanitizeForLog(notFoundAttempt.model)}" not found. Fell back to "${sanitizeForLog(candidate.provider)}/${sanitizeForLog(candidate.model)}".`,
+          );
+        }
+        return attemptRun.success;
       }
-      const notFoundAttempt =
-        i > 0 ? attempts.find((a) => a.reason === "model_not_found") : undefined;
-      if (notFoundAttempt) {
-        log.warn(
-          `Model "${sanitizeForLog(notFoundAttempt.provider)}/${sanitizeForLog(notFoundAttempt.model)}" not found. Fell back to "${sanitizeForLog(candidate.provider)}/${sanitizeForLog(candidate.model)}".`,
-        );
-      }
-      return attemptRun.success;
-    }
-    const err = attemptRun.error;
-    {
+      const err = attemptRun.error;
       if (transientProbeProviderForAttempt) {
         const probeFailureReason = describeFailoverError(err).reason;
         if (!shouldPreserveTransientCooldownProbeSlot(probeFailureReason)) {
@@ -829,6 +840,18 @@ export async function runWithModelFallback<T>(params: {
         attempt: i + 1,
         total: candidates.length,
       });
+
+      candidateAttempt += 1;
+      const shouldRetryPrimary =
+        isPrimary &&
+        candidateAttempt < maxAttemptsForCandidate &&
+        shouldRetryPrimaryCandidateBeforeFallback(described.reason ?? "unknown");
+      if (shouldRetryPrimary) {
+        // Give flaky upstreams a brief breather before retrying the selected model.
+        await sleep(PRIMARY_CANDIDATE_RETRY_DELAY_MS);
+        continue;
+      }
+      break;
     }
   }
 
