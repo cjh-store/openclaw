@@ -76,6 +76,7 @@ import {
   OVERLOAD_FAILOVER_BACKOFF_POLICY,
   resolveActiveErrorContext,
   resolveMaxRunRetryIterations,
+  RUN_RETRY_BACKOFF_POLICY,
   type RuntimeAuthState,
   scrubAnthropicRefusalMagic,
 } from "./run/helpers.js";
@@ -990,7 +991,7 @@ export async function runEmbeddedPiAgent(
               return {
                 payloads: [
                   {
-                    text: "消息顺序冲突 - 请重试。" + "如果持续出现，请用 /new 开始新会话。",
+                    text: "消息顺序冲突 - 请重试。如果持续出现，请用 /new 开始新会话。",
                     isError: true,
                   },
                 ],

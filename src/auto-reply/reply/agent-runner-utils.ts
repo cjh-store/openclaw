@@ -10,6 +10,7 @@ import {
   resolveRunAuthProfile,
 } from "./agent-runner-auth-profile.js";
 export { resolveProviderScopedAuthProfile, resolveRunAuthProfile };
+import type { ReplyPayload } from "../types.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import type { FollowupRun } from "./queue.js";
 

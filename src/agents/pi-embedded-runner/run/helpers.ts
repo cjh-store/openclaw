@@ -52,6 +52,15 @@ export function createCompactionDiagId(): string {
   return `ovf-${Date.now().toString(36)}-${generateSecureToken(4)}`;
 }
 
+// Backoff policy for general retry iterations to avoid burst requests
+// that may trigger Cloudflare or upstream rate limits.
+export const RUN_RETRY_BACKOFF_POLICY: BackoffPolicy = {
+  initialMs: 200,
+  maxMs: 2_000,
+  factor: 1.5,
+  jitter: 0.25,
+};
+
 const BASE_RUN_RETRY_ITERATIONS = 24;
 const RUN_RETRY_ITERATIONS_PER_PROFILE = 8;
 const MIN_RUN_RETRY_ITERATIONS = 32;
